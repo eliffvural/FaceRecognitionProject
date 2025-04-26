@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 
+
+#yüz tespiti işlemlerini gerçekleştiren sınıf
 class FaceDetector:
     def __init__(self, prototxt_path="../models/deploy.prototxt", model_path="../models/res10_300x300_ssd_iter_140000.caffemodel"):
         self.net = cv2.dnn.readNetFromCaffe(prototxt_path, model_path)
