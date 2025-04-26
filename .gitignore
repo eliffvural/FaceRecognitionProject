@@ -1,0 +1,7 @@
+# Python dosyaları
+__pycache__/
+*.pyc
+
+# Büyük dosyalar
+data/input/*
+data/output/*
