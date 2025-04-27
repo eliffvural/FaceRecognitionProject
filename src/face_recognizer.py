@@ -1,49 +1,91 @@
-import numpy as np
-import json
 import os
-from deepface import DeepFace
+import cv2
+import torch
+import torch.nn as nn
+import torchvision.transforms as transforms
+import numpy as np
+
+class FeatureExtractor(nn.Module):
+    def __init__(self):
+        super(FeatureExtractor, self).__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(3, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+        )
+        self.flatten = nn.Flatten()
+
+    def forward(self, x):
+        x = self.features(x)
+        x = self.flatten(x)
+        return x
 
 class FaceRecognizer:
-    def __init__(self, embeddings_file="../data/known_faces.json"):
-        self.embeddings_file = embeddings_file
-        self.known_faces = {}
-        self.face_id_counter = 0
+    def __init__(self):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = FeatureExtractor().to(self.device)
+        self.model.eval()
 
-        # Önceki vektörleri dosyadan yükle (varsa)
-        if os.path.exists(embeddings_file):
-            with open(embeddings_file, 'r') as f:
-                loaded_data = json.load(f)
-                self.known_faces = {tuple(map(float, k.split(','))): v for k, v in loaded_data.items()}
-                # Son kişi ID'sini bul
-                if self.known_faces:
-                    self.face_id_counter = max(ord(name[-1]) - 64 for name in self.known_faces.values())
+        self.transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+        ])
+        self.known_faces = {}  # {person_name: [embedding_list]}
+        self.next_person_id = 0  # Yeni kişiler için ID
+        self.threshold = 0.7  # Tanıma için güven eşiği
 
-    def save_embeddings(self):
-        # Vektörleri dosyaya kaydet (anahtarları string'e çevir)
-        embeddings_to_save = {','.join(map(str, k)): v for k, v in self.known_faces.items()}
-        with open(self.embeddings_file, 'w') as f:
-            json.dump(embeddings_to_save, f)
+    def get_embedding(self, face):
+        # Yüzü işle
+        face = cv2.resize(face, (224, 224))
+        face = cv2.cvtColor(face, cv2.COLOR_BGR2RGB)
+        face_tensor = self.transform(face).unsqueeze(0).to(self.device)
+
+        # Embedding çıkar
+        with torch.no_grad():
+            embedding = self.model(face_tensor).cpu().numpy()
+        return embedding
 
     def recognize_face(self, face):
-        try:
-            embedding = DeepFace.represent(face, model_name="Facenet", enforce_detection=False)[0]["embedding"]
-        except Exception:
-            return None
+        embedding = self.get_embedding(face)
 
-        # Bu yüzü daha önce gördük mü?
-        recognized_name = None
-        for known_embedding, name in self.known_faces.items():
-            distance = np.linalg.norm(np.array(embedding) - np.array(known_embedding))
-            if distance < 10:  # Eşik değeri
-                recognized_name = name
-                break
+        # Bilinen yüzlerle karşılaştır
+        min_dist = float('inf')
+        recognized_person = "Bilinmeyen Kişi"
+        for person_name, embeddings in self.known_faces.items():
+            for known_embedding in embeddings:
+                dist = np.linalg.norm(embedding - known_embedding)
+                if dist < min_dist and dist < self.threshold:
+                    min_dist = dist
+                    recognized_person = person_name
 
-        # Yeni yüzse kaydet
-        if recognized_name is None:
-            self.face_id_counter += 1
-            recognized_name = f"Kişi {chr(64 + self.face_id_counter)}"  # A, B, C...
-            self.known_faces[tuple(embedding)] = recognized_name
-            print(f"Yeni yüz kaydedildi: {recognized_name}")
-            self.save_embeddings()  # Yeni yüzü dosyaya kaydet
+        # Eğer bilinmeyen bir yüzse, kaydet
+        if recognized_person == "Bilinmeyen Kişi":
+            new_person_name = f"person_{chr(65 + self.next_person_id)}"  # Örneğin, person_A
+            self.save_face(face, new_person_name, embedding)
+            recognized_person = new_person_name
+            self.next_person_id += 1
 
-        return recognized_name
+        return recognized_person
+
+    def save_face(self, face, person_name, embedding):
+        # Yüzü kaydet
+        save_dir = f"../data/known_faces/{person_name}/"
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+        
+        # Yüzü kaydet (örneğin, face_1.jpg)
+        face_count = len(os.listdir(save_dir)) + 1
+        save_path = os.path.join(save_dir, f"face_{face_count}.jpg")
+        cv2.imwrite(save_path, cv2.cvtColor(face, cv2.COLOR_RGB2BGR))
+        print(f"Yüz kaydedildi: {save_path}")
+
+        # Embedding’i kaydet
+        if person_name not in self.known_faces:
+            self.known_faces[person_name] = []
+        self.known_faces[person_name].append(embedding)
