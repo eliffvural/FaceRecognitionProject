@@ -1,3 +1,5 @@
 opencv-python
-deepface
 numpy
+torch
+torchvision
+dlib

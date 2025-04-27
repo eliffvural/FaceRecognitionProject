@@ -1,10 +1,15 @@
 import cv2
 import numpy as np
+import os
 
-
-#yüz tespiti işlemlerini gerçekleştiren sınıf
 class FaceDetector:
     def __init__(self, prototxt_path="../models/deploy.prototxt", model_path="../models/res10_300x300_ssd_iter_140000.caffemodel"):
+        # Dosyaların varlığını kontrol et
+        if not os.path.exists(prototxt_path):
+            raise FileNotFoundError(f"Prototxt dosyası bulunamadı: {prototxt_path}")
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model dosyası bulunamadı: {model_path}")
+        
         self.net = cv2.dnn.readNetFromCaffe(prototxt_path, model_path)
 
     def detect_faces(self, frame, confidence_threshold=0.5):
