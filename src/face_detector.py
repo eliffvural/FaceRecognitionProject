@@ -3,7 +3,13 @@ import numpy as np
 import os
 
 class FaceDetector:
-    def __init__(self, prototxt_path="../models/deploy.prototxt", model_path="../models/res10_300x300_ssd_iter_140000.caffemodel"):
+    def __init__(self, prototxt_path=None, model_path=None):
+        # Varsayılan yollar
+        if prototxt_path is None:
+            prototxt_path = os.path.join(os.path.dirname(__file__), "../models/deploy.prototxt")
+        if model_path is None:
+            model_path = os.path.join(os.path.dirname(__file__), "../models/res10_300x300_ssd_iter_140000.caffemodel")
+
         # Dosyaların varlığını kontrol et
         if not os.path.exists(prototxt_path):
             raise FileNotFoundError(f"Prototxt dosyası bulunamadı: {prototxt_path}")

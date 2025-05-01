@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
 import numpy as np
+from scipy.spatial.distance import cosine
 
 class FeatureExtractor(nn.Module):
     def __init__(self):
@@ -38,7 +39,7 @@ class FaceRecognizer:
         ])
         self.known_faces = {}  # {person_name: [embedding_list]}
         self.next_person_id = 0  # Yeni kişiler için ID
-        self.threshold = 0.7  # Tanıma için güven eşiği
+        self.threshold = 1.2  # Tanıma için güven eşiği (artırıldı)
 
     def get_embedding(self, face):
         # Yüzü işle
@@ -59,7 +60,9 @@ class FaceRecognizer:
         recognized_person = "Bilinmeyen Kişi"
         for person_name, embeddings in self.known_faces.items():
             for known_embedding in embeddings:
-                dist = np.linalg.norm(embedding - known_embedding)
+                # Kosinüs benzerliği kullanarak mesafeyi hesapla
+                dist = cosine(embedding.flatten(), known_embedding.flatten())
+                print(f"{person_name} ile mesafe: {dist}")  # Debugging için mesafeyi yazdır
                 if dist < min_dist and dist < self.threshold:
                     min_dist = dist
                     recognized_person = person_name
@@ -67,6 +70,7 @@ class FaceRecognizer:
         # Eğer bilinmeyen bir yüzse, kaydet
         if recognized_person == "Bilinmeyen Kişi":
             new_person_name = f"person_{chr(65 + self.next_person_id)}"  # Örneğin, person_A
+            print(f"Yeni kişi kaydediliyor: {new_person_name}")
             self.save_face(face, new_person_name, embedding)
             recognized_person = new_person_name
             self.next_person_id += 1
@@ -75,15 +79,18 @@ class FaceRecognizer:
 
     def save_face(self, face, person_name, embedding):
         # Yüzü kaydet
-        save_dir = f"../data/known_faces/{person_name}/"
+        save_dir = os.path.join(os.path.dirname(__file__), "../data/known_faces", person_name)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         
         # Yüzü kaydet (örneğin, face_1.jpg)
         face_count = len(os.listdir(save_dir)) + 1
         save_path = os.path.join(save_dir, f"face_{face_count}.jpg")
-        cv2.imwrite(save_path, cv2.cvtColor(face, cv2.COLOR_RGB2BGR))
-        print(f"Yüz kaydedildi: {save_path}")
+        success = cv2.imwrite(save_path, cv2.cvtColor(face, cv2.COLOR_RGB2BGR))
+        if success:
+            print(f"Yüz kaydedildi: {save_path}")
+        else:
+            print(f"Yüz kaydedilemedi: {save_path}")
 
         # Embedding’i kaydet
         if person_name not in self.known_faces:
