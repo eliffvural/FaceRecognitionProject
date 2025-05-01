@@ -1,52 +1,44 @@
 import cv2
 import numpy as np
-import dlib
-import os
 
 class LipMovementDetector:
     def __init__(self):
-        # Dlib’in yüz landmark tahmincisini yükle
-        predictor_path = os.path.join(os.path.dirname(__file__), "shape_predictor_68_face_landmarks.dat")
-        if not os.path.exists(predictor_path):
-            raise FileNotFoundError(f"Landmark tahmin dosyası bulunamadı: {predictor_path}. Lütfen indirin: https://github.com/davisking/dlib-models")
-        
-        self.detector = dlib.get_frontal_face_detector()
-        self.predictor = dlib.shape_predictor(predictor_path)
+        self.movement_threshold = 3000  # Eşiği artırdık, daha az hassas
+        self.min_frames_for_speaking = 3  # Konuşma için 3 çerçeve üst üste hareket şart
+        self.speaking_counter = {}  # Her yüz ID’si için konuşma sayacı
 
-    def detect_lip_movement(self, frame):
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = self.detector(gray)
+    def detect(self, prev_frame, curr_frame, face_coords):
+        # Yüz ID’sini oluştur (konum bilgisiyle benzersiz bir kimlik oluşturuyoruz)
+        face_id = f"{face_coords[0]}_{face_coords[1]}"  # x ve y koordinatları ile ID
 
-        if len(faces) == 0:
-            return False, None
+        # Yüz bölgesinin alt yarısını al (dudak bölgesi tahmini)
+        h = face_coords[3]  # Yüz yüksekliği
+        lip_region_prev = prev_frame[int(h/2):h, :]
+        lip_region_curr = curr_frame[int(h/2):h, :]
 
-        # İlk yüzü al
-        face = faces[0]
-        landmarks = self.predictor(gray, face)
+        # Gri tonlamaya çevir
+        lip_region_prev = cv2.cvtColor(lip_region_prev, cv2.COLOR_BGR2GRAY)
+        lip_region_curr = cv2.cvtColor(lip_region_curr, cv2.COLOR_BGR2GRAY)
 
-        # Dudak noktalarını al (48-67 indeksleri dudaklar için)
-        lip_points = []
-        for i in range(48, 68):
-            x = landmarks.part(i).x
-            y = landmarks.part(i).y
-            lip_points.append((x, y))
+        # Gürültüyü azaltmak için bulanıklaştırma uygula
+        lip_region_prev = cv2.GaussianBlur(lip_region_prev, (5, 5), 0)
+        lip_region_curr = cv2.GaussianBlur(lip_region_curr, (5, 5), 0)
 
-        # Dudak noktalarının doğru boyutta olduğundan emin ol
-        if len(lip_points) < 20:  # 48-67 arası toplam 20 nokta olmalı
-            print("Dudak noktaları eksik, konuşma tespiti atlanıyor.")
-            return False, lip_points
+        # Farkı hesapla
+        diff = cv2.absdiff(lip_region_prev, lip_region_curr)
+        diff_sum = np.sum(diff)
 
-        # Dudak açıklığını hesapla (örneğin, iç dudaklar arasındaki mesafe)
-        try:
-            lip_height = abs(lip_points[14][1] - lip_points[18][1])  # 62-48=14, 66-48=18
-            lip_width = abs(lip_points[12][0] - lip_points[16][0])   # 60-48=12, 64-48=16
-            lip_ratio = lip_height / lip_width if lip_width > 0 else 0
+        # Hareket eşiğini kontrol et
+        if diff_sum > self.movement_threshold:
+            # Eğer bu yüz için sayaç yoksa başlat
+            if face_id not in self.speaking_counter:
+                self.speaking_counter[face_id] = 0
+            self.speaking_counter[face_id] += 1
+        else:
+            # Hareket yoksa sayacı sıfırla
+            self.speaking_counter[face_id] = 0
 
-            # Eşik değeri (konuşma için dudak hareketi)
-            threshold = 0.3
-            is_speaking = lip_ratio > threshold
-        except IndexError as e:
-            print(f"Dudak noktaları hesaplanırken hata: {e}")
-            return False, lip_points
-
-        return is_speaking, lip_points
+        # Konuşma için minimum çerçeve sayısını kontrol et
+        if self.speaking_counter.get(face_id, 0) >= self.min_frames_for_speaking:
+            return True
+        return False
