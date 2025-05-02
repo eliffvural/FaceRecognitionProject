@@ -1,106 +1,66 @@
-import os
 import cv2
-import numpy as np
 import face_recognition
+import os
+import numpy as np
 
 class FaceRecognizer:
     def __init__(self):
-        self.known_faces = {}  # {person_name: [encoding_list]}
-        self.next_person_id = 0  # Yeni kişiler için ID
-        self.tolerance = 0.5  # face_recognition için eşleşme toleransı (mesafe eşiği)
-        self.unknown_count = {}  # Tutarlılık kontrolü için sayaç
-        self.min_frames_for_new_person = 10  # Yeni kişi kaydetmeden önce 10 çerçeve tutarlılık
+        self.known_face_encodings = []
+        self.known_face_names = []
+        self.session_face_encodings = []  # Oturum boyunca bilinmeyen yüzleri sakla
+        self.session_face_names = []  # Oturum boyunca bilinmeyen yüzlerin isimlerini sakla
+        self.person_counter = 0  # Yeni kişiler için sayaç (A, B, ... olarak isimlendirmek için)
+        self.load_known_faces()
 
-    def get_encoding(self, face, frame, face_coords):
-        # face_coords: (y, x2, y2, x) formatında olmalı (face_recognition için)
-        y, x, x2, y2 = face_coords
-        encoding = face_recognition.face_encodings(frame, [(y, x2, y2, x)])
-        if len(encoding) == 0:
-            return None
-        return encoding[0]
+    def load_known_faces(self):
+        known_faces_dir = "data/known_faces"
+        if not os.path.exists(known_faces_dir):
+            os.makedirs(known_faces_dir)
+        for filename in os.listdir(known_faces_dir):
+            if filename.endswith(".jpg") or filename.endswith(".png"):
+                image_path = os.path.join(known_faces_dir, filename)
+                image = face_recognition.load_image_file(image_path)
+                encodings = face_recognition.face_encodings(image)
+                if len(encodings) > 0:
+                    encoding = encodings[0]
+                    name = os.path.splitext(filename)[0]
+                    self.known_face_encodings.append(encoding)
+                    self.known_face_names.append(name)
 
-    def recognize_face(self, face, frame, face_coords):
-        encoding = self.get_encoding(face, frame, face_coords)
-        if encoding is None:
-            return None
-
-        # Veri tabanı boşsa ilk kişiyi doğrudan kaydet
-        if not self.known_faces:
-            person_name = "personA"  # İlk kişi her zaman "personA" olacak
-            print(f"Yeni kişi kaydediliyor: {person_name}")
-            self.save_face(face, person_name, encoding)
-            self.next_person_id = 1  # İlk kişi kaydedildi, sonraki kişi için ID artır
-            self.unknown_count = {}  # Sayacı sıfırla
-            return person_name
-
-        # Bilinen yüzlerle karşılaştır
-        all_encodings = []
-        name_mapping = []
-        for person_name, encodings in self.known_faces.items():
-            for enc in encodings:
-                all_encodings.append(enc)
-                name_mapping.append(person_name)
-
-        if not all_encodings:
+    def recognize_face(self, face_image, frame, face_coords):
+        rgb_face = cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)
+        encodings = face_recognition.face_encodings(rgb_face)
+        if len(encodings) == 0:
             return None
 
-        # face_recognition ile eşleşme kontrolü yap
-        matches = face_recognition.compare_faces(all_encodings, encoding, tolerance=self.tolerance)
-        face_distances = face_recognition.face_distance(all_encodings, encoding)
+        face_encoding = encodings[0]
 
-        recognized_person = None
-        if len(face_distances) > 0:
-            best_match_index = np.argmin(face_distances)
-            if matches[best_match_index]:
-                recognized_person = name_mapping[best_match_index]
-                print(f"{recognized_person} ile mesafe: {face_distances[best_match_index]}")
+        # Önce bilinen yüzlerle eşleştir
+        if self.known_face_encodings:
+            matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding, tolerance=0.5)
+            if True in matches:
+                first_match_index = matches.index(True)
+                name = self.known_face_names[first_match_index]
+                return name
 
-        # Tanıma başarılıysa unknown_count'u sıfırla
-        if recognized_person:
-            if recognized_person in self.unknown_count:
-                self.unknown_count[recognized_person] = 0
-            return recognized_person
+        # Bilinmeyen bir yüzse, oturumdaki yüzlerle eşleştir
+        if self.session_face_encodings:
+            matches = face_recognition.compare_faces(self.session_face_encodings, face_encoding, tolerance=0.5)
+            if True in matches:
+                first_match_index = matches.index(True)
+                name = self.session_face_names[first_match_index]
+                return name
 
-        # Eşleşme bulunamadı, tutarlılık kontrolü yap
-        temp_person_name = f"temp_{self.next_person_id}"
-        if temp_person_name not in self.unknown_count:
-            self.unknown_count[temp_person_name] = 0
-        self.unknown_count[temp_person_name] += 1
+        # Yeni bir kişi olarak kaydet (personA, personB, ... şeklinde)
+        self.person_counter += 1
+        name = f"person{chr(64 + self.person_counter)}"  # 1 -> personA, 2 -> personB, ...
+        self.session_face_encodings.append(face_encoding)
+        self.session_face_names.append(name)
+        print(f"Yeni kişi eklendi: {name}")
+        return name
 
-        # Eğer belirli sayıda çerçevede tutarlı bir şekilde eşleşme bulunamadıysa yeni kişi kaydet
-        if self.unknown_count[temp_person_name] >= self.min_frames_for_new_person:
-            new_person_name = f"person{chr(65 + self.next_person_id)}"  # Örneğin, personB, personC...
-            print(f"Yeni kişi kaydediliyor: {new_person_name}")
-            self.save_face(face, new_person_name, encoding)
-            self.next_person_id += 1
-            self.unknown_count.pop(temp_person_name)  # Sayacı sıfırla
-            return new_person_name
-
-        print(f"Eşleşme bulunamadı, tutarlılık kontrolü: {self.unknown_count[temp_person_name]}/{self.min_frames_for_new_person}")
-        return None  # Henüz yeni kişi kaydetmiyoruz
-
-    def save_face(self, face, person_name, encoding):
-        # Yüzü kaydet
-        save_dir = f"data/known_faces/{person_name}/"
-        if not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-        
-        # Yüzü kaydet (en fazla 3 görüntü sakla)
-        face_count = len(os.listdir(save_dir)) + 1
-        if face_count > 3:  # Eğer 3’ten fazla görüntü varsa, eski bir görüntüyü sil
-            old_face = os.path.join(save_dir, f"face_{face_count - 3}.jpg")
-            if os.path.exists(old_face):
-                os.remove(old_face)
-            face_count -= 1
-
-        save_path = os.path.join(save_dir, f"face_{face_count}.jpg")
-        success = cv2.imwrite(save_path, cv2.cvtColor(face, cv2.COLOR_RGB2BGR))
-        if success:
-            print(f"Yüz kaydedildi: {save_path}")
-        else:
-            print(f"Yüz kaydedilemedi: {save_path}")
-
-        # Encoding’i kaydet
-        if person_name not in self.known_faces:
-            self.known_faces[person_name] = []
-        self.known_faces[person_name].append(encoding)
+    def reset_session(self):
+        # Yeni bir video için oturumu sıfırla
+        self.session_face_encodings = []
+        self.session_face_names = []
+        self.person_counter = 0

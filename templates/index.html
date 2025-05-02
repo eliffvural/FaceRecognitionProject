@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kayıtlı Video ile Yüz Tanıma</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            display: block;
+            margin: 10px 0 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #progress {
+            margin-top: 20px;
+            font-style: italic;
+            color: #555;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Kayıtlı Video ile Yüz Tanıma</h1>
+        <form id="videoForm">
+            <label for="video_url">Video URL (YouTube Shorts veya doğrudan URL):</label>
+            <input type="text" id="video_url" name="video_url" placeholder="örn: https://www.youtube.com/shorts/abc123">
+            <button type="button" onclick="processVideo('url')">URL’den İşle</button>
+
+            <label for="video_file">Video Dosyası Yükle:</label>
+            <input type="file" id="video_file" name="video_file" accept="video/*">
+            <button type="button" onclick="processVideo('file')">Dosyadan İşle</button>
+        </form>
+
+        <div id="progress">Sonuçlar burada görüntülenecek...</div>
+        <table id="resultsTable" style="display: none;">
+            <thead>
+                <tr>
+                    <th>Kişi</th>
+                    <th>Konuşma Süresi (saniye)</th>
+                </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+        </table>
+    </div>
+
+    <script>
+        function processVideo(source) {
+            const progressDiv = document.getElementById('progress');
+            const resultsTable = document.getElementById('resultsTable');
+            const resultsBody = document.getElementById('resultsBody');
+
+            progressDiv.innerText = 'Video işleniyor...';
+            resultsTable.style.display = 'none';
+            resultsBody.innerHTML = '';
+
+            let formData = new FormData();
+            if (source === 'url') {
+                const url = document.getElementById('video_url').value;
+                if (!url) {
+                    progressDiv.innerText = 'Lütfen bir URL girin!';
+                    return;
+                }
+                formData.append('video_url', url);
+            } else {
+                const fileInput = document.getElementById('video_file');
+                if (!fileInput.files[0]) {
+                    progressDiv.innerText = 'Lütfen bir dosya seçin!';
+                    return;
+                }
+                formData.append('video_file', fileInput.files[0]);
+            }
+
+            fetch('/process', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                function read() {
+                    reader.read().then(({ done, value }) => {
+                        if (done) {
+                            console.log('Stream tamamlandı.');
+                            return;
+                        }
+
+                        const chunk = decoder.decode(value, { stream: true });
+                        const lines = chunk.split('\n');
+                        lines.forEach(line => {
+                            if (line.trim() === '') return;
+                            try {
+                                const data = JSON.parse(line);
+                                if (data.error) {
+                                    progressDiv.innerText = `Hata: ${data.error}`;
+                                    return;
+                                }
+                                progressDiv.innerText = data.progress || 'İşleniyor...';
+                                if (data.results) {
+                                    resultsTable.style.display = 'table';
+                                    resultsBody.innerHTML = '';
+                                    for (const [person, time] of Object.entries(data.results)) {
+                                        const row = document.createElement('tr');
+                                        row.innerHTML = `<td>${person}</td><td>${time.toFixed(2)}</td>`;
+                                        resultsBody.appendChild(row);
+                                    }
+                                }
+                            } catch (e) {
+                                console.error('JSON parse hatası:', e, 'Line:', line);
+                            }
+                        });
+                        read();
+                    });
+                }
+                read();
+            })
+            .catch(error => {
+                progressDiv.innerText = `Hata: ${error.message}`;
+                console.error('Fetch hatası:', error);
+            });
+        }
+    </script>
+</body>
+</html>

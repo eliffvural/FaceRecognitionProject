@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canlı Video ile Yüz Tanıma</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .container {
+            text-align: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        video {
+            width: 640px;
+            height: 480px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0 10px;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #stopButton {
+            background-color: #f44336;
+        }
+        #stopButton:hover {
+            background-color: #da190b;
+        }
+        #progress {
+            margin-top: 20px;
+            font-style: italic;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Canlı Video ile Yüz Tanıma</h1>
+        <video id="video" autoplay playsinline></video>
+        <div>
+            <button id="startButton" onclick="startProcessing()">Başlat</button>
+            <button id="stopButton" onclick="stopProcessing()" disabled>Bitir</button>
+        </div>
+        <div id="progress">Kamera başlatıldı, işlem için "Başlat" butonuna tıklayın...</div>
+    </div>
+
+    <script>
+        let stream;
+        let isProcessing = false;
+
+        // Kamerayı başlat
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+            } catch (err) {
+                document.getElementById('progress').innerText = `Kamera başlatılamadı: ${err.message}`;
+                console.error('Kamera hatası:', err);
+            }
+        }
+
+        // Kamerayı durdur
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            const video = document.getElementById('video');
+            video.srcObject = null;
+        }
+
+        // İşleme başlat
+        function startProcessing() {
+            if (isProcessing) return;
+            isProcessing = true;
+            document.getElementById('startButton').disabled = true;
+            document.getElementById('stopButton').disabled = false;
+            document.getElementById('progress').innerText = 'İşleme başlatıldı...';
+            console.log('İşleme başlatıldı');
+            // Burada canlı video işleme mantığı eklenecek
+        }
+
+        // İşleme durdur
+        function stopProcessing() {
+            if (!isProcessing) return;
+            isProcessing = false;
+            document.getElementById('startButton').disabled = false;
+            document.getElementById('stopButton').disabled = true;
+            document.getElementById('progress').innerText = 'İşleme durduruldu.';
+            console.log('İşleme durduruldu');
+            // Burada işleme durdurma mantığı eklenecek
+        }
+
+        // Sayfayı yüklerken kamerayı başlat
+        window.onload = startCamera;
+
+        // Sayfadan çıkarken kamerayı durdur
+        window.onbeforeunload = stopCamera;
+    </script>
+</body>
+</html>

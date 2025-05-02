@@ -1,44 +1,57 @@
+import dlib
 import cv2
 import numpy as np
+import os
 
 class LipMovementDetector:
     def __init__(self):
-        self.movement_threshold = 3000  # Eşiği artırdık, daha az hassas
-        self.min_frames_for_speaking = 3  # Konuşma için 3 çerçeve üst üste hareket şart
-        self.speaking_counter = {}  # Her yüz ID’si için konuşma sayacı
+        # Dosyanın tam yolunu belirle
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        predictor_path = os.path.join(current_dir, "shape_predictor_68_face_landmarks.dat")
+        if not os.path.exists(predictor_path):
+            raise FileNotFoundError(f"Shape predictor dosyası bulunamadı: {predictor_path}")
+        self.predictor = dlib.shape_predictor(predictor_path)
 
-    def detect(self, prev_frame, curr_frame, face_coords):
-        # Yüz ID’sini oluştur (konum bilgisiyle benzersiz bir kimlik oluşturuyoruz)
-        face_id = f"{face_coords[0]}_{face_coords[1]}"  # x ve y koordinatları ile ID
+    def detect(self, prev_frame, curr_frame, face_coords, frame):
+        x, y, w, h = face_coords
 
-        # Yüz bölgesinin alt yarısını al (dudak bölgesi tahmini)
-        h = face_coords[3]  # Yüz yüksekliği
-        lip_region_prev = prev_frame[int(h/2):h, :]
-        lip_region_curr = curr_frame[int(h/2):h, :]
+        # Grayscale’e çevir
+        prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
+        curr_gray = cv2.cvtColor(curr_frame, cv2.COLOR_BGR2GRAY)
 
-        # Gri tonlamaya çevir
-        lip_region_prev = cv2.cvtColor(lip_region_prev, cv2.COLOR_BGR2GRAY)
-        lip_region_curr = cv2.cvtColor(lip_region_curr, cv2.COLOR_BGR2GRAY)
+        # Dudak noktalarını bul
+        rect = dlib.rectangle(x, y, x + w, y + h)
+        shape = self.predictor(curr_gray, rect)
+        lip_points = [(shape.part(i).x, shape.part(i).y) for i in range(48, 68)]
 
-        # Gürültüyü azaltmak için bulanıklaştırma uygula
-        lip_region_prev = cv2.GaussianBlur(lip_region_prev, (5, 5), 0)
-        lip_region_curr = cv2.GaussianBlur(lip_region_curr, (5, 5), 0)
+        # Dudak noktalarını çerçeve üzerinde işaretle (hata ayıklama için)
+        for (px, py) in lip_points:
+            cv2.circle(frame, (px, py), 1, (255, 0, 0), -1)
+
+        # Dudak bölgesini sınırlandır (dudak noktalarına göre)
+        lip_x = min(p[0] for p in lip_points) - x
+        lip_y = min(p[1] for p in lip_points) - y
+        lip_w = max(p[0] for p in lip_points) - x - lip_x
+        lip_h = max(p[1] for p in lip_points) - y - lip_y
+
+        # Dudak bölgesini kırp
+        prev_lip_region = prev_gray[lip_y:lip_y+lip_h, lip_x:lip_x+lip_w]
+        curr_lip_region = curr_gray[lip_y:lip_y+lip_h, lip_x:lip_x+lip_w]
+
+        if prev_lip_region.shape != curr_lip_region.shape or prev_lip_region.size == 0 or curr_lip_region.size == 0:
+            return False
 
         # Farkı hesapla
-        diff = cv2.absdiff(lip_region_prev, lip_region_curr)
-        diff_sum = np.sum(diff)
+        diff = cv2.absdiff(prev_lip_region, curr_lip_region)
+        movement = np.sum(diff)
 
-        # Hareket eşiğini kontrol et
-        if diff_sum > self.movement_threshold:
-            # Eğer bu yüz için sayaç yoksa başlat
-            if face_id not in self.speaking_counter:
-                self.speaking_counter[face_id] = 0
-            self.speaking_counter[face_id] += 1
-        else:
-            # Hareket yoksa sayacı sıfırla
-            self.speaking_counter[face_id] = 0
+        # Hareketi normalizasyon yaparak eşikle karşılaştır
+        area = lip_w * lip_h
+        if area == 0:
+            return False
+        normalized_movement = movement / area
 
-        # Konuşma için minimum çerçeve sayısını kontrol et
-        if self.speaking_counter.get(face_id, 0) >= self.min_frames_for_speaking:
-            return True
-        return False
+        # Dinamik eşik değeri: Yanlış pozitifleri azaltmak için eşik artırıldı
+        threshold = max(8, min(20, area * 0.03))  # Daha yüksek eşik
+        print(f"Dudak hareketi: normalized_movement={normalized_movement:.2f}, threshold={threshold:.2f}, area={area}")
+        return normalized_movement > threshold
