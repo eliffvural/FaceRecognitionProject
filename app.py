@@ -4,11 +4,15 @@ import os
 from src.face_detector import FaceDetector
 from src.face_recognizer import FaceRecognizer
 from src.lip_movement_detector import LipMovementDetector
+from src.lip_movement_detector2 import LipMovementDetector2
 import urllib.request
 import numpy as np
 import yt_dlp
 import time
 import json
+from deepface import DeepFace
+from collections import defaultdict
+import time
 
 app = Flask(__name__)
 
@@ -157,6 +161,101 @@ def process_video_stream(video_source):
         "results": filtered_speaking_times
     }) + "\n"
 
+from collections import defaultdict
+import time
+
+
+
+def generate_frames():
+    cap = cv2.VideoCapture(0)
+    detector = FaceDetector()
+    recognizer = FaceRecognizer()
+    lip_detector = LipMovementDetector2()
+
+    global unknown_faces, unknown_counter
+    global talking_durations, talking_start_times, currently_talking
+
+    talking_durations = defaultdict(float)     # Toplam konuşma süresi
+    talking_start_times = {}                   # Aktif konuşma başlangıçları
+    currently_talking = set() 
+
+    unknown_faces = {}
+    unknown_counter = 0
+
+    prev_frame = None
+
+    while True:
+        success, frame = cap.read()
+        if not success:
+            break
+
+        faces = detector.detect_faces(frame)
+
+        detected_names = set()  # O an karede görünen kişiler
+
+        for (x, y, x2, y2) in faces:
+            face = frame[y:y2, x:x2]
+            name = recognizer.recognize_face(face, frame, (y, x, x2, y2))
+
+            if name is None:
+                face_id = hash(face.tobytes())
+                if face_id not in unknown_faces:
+                    unknown_counter += 1
+                    unknown_faces[face_id] = f"Person{chr(64 + unknown_counter)}"  # A, B, C...
+                name = unknown_faces[face_id]
+
+
+            cv2.rectangle(frame, (x, y), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(frame, name, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+            if prev_frame is not None:
+                is_talking = lip_detector.detect(prev_frame, frame, (x, y, x2 - x, y2 - y), frame)
+
+                if is_talking:
+                    cv2.putText(frame, "Konusuyor", (x, y2 + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+
+                    if name not in currently_talking:
+                        talking_start_times[name] = time.time()
+                        currently_talking.add(name)
+
+                else:
+                    if name in currently_talking:
+                        start = talking_start_times.pop(name, None)
+                        if start is not None:
+                            duration = time.time() - start
+                            if duration >= 1.0:  # En az 1 saniye konuşmuş olmalı
+                                talking_durations[name] += duration
+                        currently_talking.remove(name)
+
+        
+
+
+
+            try:
+                result = DeepFace.analyze(face, actions=['emotion'], enforce_detection=False)
+                dominant_emotion = result[0]['dominant_emotion']
+                cv2.putText(frame, f"Duygu: {dominant_emotion}", (x, y2 + 60), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 2)
+                print(f"{name} Duygu Durumu: {dominant_emotion}")
+            except Exception as e:
+                print(f"Duygu analizi hatası: {e}")
+
+        # Konuşan kişi artık görünmüyorsa, konuşmayı kesmiş say
+        for name in list(currently_talking):
+            if name not in detected_names:
+                start = talking_start_times.pop(name, None)
+                if start is not None:
+                    talking_durations[name] += time.time() - start
+                currently_talking.remove(name)
+
+        prev_frame = frame.copy()
+
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame_bytes = buffer.tobytes()
+        yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+
+    cap.release()
+    cv2.destroyAllWindows()
+
 # Ana sayfa
 @app.route('/')
 def home():
@@ -171,6 +270,31 @@ def recorded():
 @app.route('/live')
 def live():
     return render_template('live.html')
+
+@app.route('/camera_stream', methods=['GET', 'OPTIONS'])
+def video_feed():
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+from flask import jsonify
+
+@app.route('/speech_data')
+def speech_data():
+    # Güncel konuşan varsa, süresini ekle
+    current_time = time.time()
+    updated_durations = {}
+
+    for name, start_time in talking_start_times.items():
+        updated_durations[name] = talking_durations.get(name, 0) + (current_time - start_time)
+
+    # Diğerlerini de ekle
+    for name, total_time in talking_durations.items():
+        if name not in updated_durations:
+            updated_durations[name] = total_time
+
+    # JSON olarak gönder
+    response = [{"kisi": name, "sure": round(seconds, 1)} for name, seconds in updated_durations.items()]
+    return jsonify(response)
+
 
 @app.route('/process', methods=['POST'])
 def process():
@@ -222,4 +346,4 @@ def process():
     return Response(generate(video_source=video_source, temp_file_path=temp_file_path), mimetype='application/json')
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(host="127.0.0.1", port=5000, debug=True)
