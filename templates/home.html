@@ -4,49 +4,225 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Yüz Tanıma - Ana Sayfa</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        * {
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            padding: 20px;
         }
+
         .container {
             text-align: center;
-            background-color: #fff;
-            padding: 40px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            max-width: 800px;
+            width: 100%;
+            transform: translateY(0);
+            transition: transform 0.3s ease;
         }
+
+        .container:hover {
+            transform: translateY(-5px);
+        }
+
+        .logo {
+            font-size: 4em;
+            color: #667eea;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+
         h1 {
-            color: #333;
-            margin-bottom: 30px;
+            color: #2d3748;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+            font-weight: 600;
+            line-height: 1.2;
         }
+
+        .description {
+            color: #4a5568;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+            line-height: 1.6;
+        }
+
+        .features {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .feature {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            flex: 1;
+            min-width: 200px;
+            max-width: 250px;
+            transition: transform 0.3s ease;
+        }
+
+        .feature:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature i {
+            font-size: 2em;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .feature h3 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .feature p {
+            color: #4a5568;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .button-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
         button {
-            background-color: #4CAF50;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 15px 30px;
             border: none;
-            border-radius: 4px;
+            border-radius: 12px;
             cursor: pointer;
             font-size: 16px;
-            margin: 10px;
-            transition: background-color 0.3s;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            min-width: 200px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
+
         button:hover {
-            background-color: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.6s ease, height 0.6s ease;
+        }
+
+        button:hover::after {
+            width: 300px;
+            height: 300px;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 20px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .features {
+                gap: 20px;
+            }
+
+            .feature {
+                min-width: 100%;
+            }
+
+            button {
+                min-width: 160px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="logo">
+            <i class="fas fa-face-smile"></i>
+        </div>
         <h1>Yüz Tanıma ve Konuşma Süresi Tespiti</h1>
-        <button onclick="window.location.href='/live'">Canlı Video ile</button>
-        <button onclick="window.location.href='/recorded'">Kayıtlı Video ile</button>
+        <p class="description">
+            Yapay zeka destekli yüz tanıma sistemi ile konuşma sürelerini analiz edin ve duygu durumlarını tespit edin.
+        </p>
+        
+        <div class="features">
+            <div class="feature">
+                <i class="fas fa-video"></i>
+                <h3>Canlı Analiz</h3>
+                <p>Gerçek zamanlı yüz tanıma ve konuşma analizi yapın.</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-file-video"></i>
+                <h3>Kayıtlı Video</h3>
+                <p>Mevcut videolardan detaylı analiz raporları oluşturun.</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-chart-line"></i>
+                <h3>Detaylı Raporlar</h3>
+                <p>Konuşma süreleri ve duygu analizlerini görüntüleyin.</p>
+            </div>
+        </div>
+
+        <div class="button-container">
+            <button onclick="window.location.href='/live'">
+                <i class="fas fa-camera"></i>
+                Canlı Video ile
+            </button>
+            <button onclick="window.location.href='/recorded'">
+                <i class="fas fa-file-video"></i>
+                Kayıtlı Video ile
+            </button>
+        </div>
     </div>
 </body>
 </html>

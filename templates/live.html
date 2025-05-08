@@ -2,101 +2,228 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Canlı Yüz Tanıma</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
+            padding: 40px 20px;
         }
 
         .container {
-            text-align: center;
-            background: #fff;
-            padding: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            max-width: 800px;
+            width: 100%;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .back-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #2d3748;
+            padding: 8px 15px;
             border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: 1px solid #e2e8f0;
+        }
+
+        .back-button:hover {
+            background: white;
+            transform: translateX(-3px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         h1 {
-            margin-bottom: 20px;
-            color: #333;
+            color: #2d3748;
+            margin-bottom: 30px;
+            font-size: 2em;
+            font-weight: 600;
+            text-align: center;
+            padding-top: 40px;
+        }
+
+        h2 {
+            color: #2d3748;
+            margin: 30px 0 20px;
+            font-size: 1.5em;
+            font-weight: 500;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
 
         img {
-            width: 640px;
-            height: 480px;
-            border: 2px solid #ccc;
-            border-radius: 4px;
+            width: 100%;
+            height: auto;
             display: none;
+            border-radius: 12px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin: 20px 0;
         }
 
         button {
-            margin: 10px;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            border: none;
-            border-radius: 4px;
-        }
-
-        #startBtn {
-            background-color: #4CAF50;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            min-width: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
 
         #stopBtn {
-            background-color: #f44336;
-            color: white;
+            background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
         }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
         table {
             width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             margin-top: 20px;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
         }
+
         th, td {
-            padding: 10px;
-            border: 1px solid #ddd;
+            padding: 15px;
             text-align: left;
+            border-bottom: 1px solid #edf2f7;
         }
+
         th {
-            background-color: #4CAF50;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            font-weight: 500;
         }
+
+        th i {
+            margin-right: 8px;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
         tr:nth-child(even) {
-            background-color: #f2f2f2;
+            background-color: #f8fafc;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            button {
+                width: 100%;
+                max-width: 200px;
+            }
+
+            .back-button {
+                position: static;
+                margin-bottom: 20px;
+                display: inline-flex;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Canlı Yüz Tanıma, Konuşma ve Duygu Analizi</h1>
-        <img id="cameraFeed" alt="Canlı Görüntü">
-        <div>
-            <button id="startBtn">Başlat</button>
-            <button id="stopBtn">Durdur</button>
+        <a href="/" class="back-button">
+            <i class="fas fa-arrow-left"></i>
+            Geri
+        </a>
+        <h1><i class="fas fa-camera"></i> Canlı Yüz Tanıma, Konuşma ve Duygu Analizi</h1>
+        <div class="video-container">
+            <img id="cameraFeed" alt="Canlı Görüntü">
+        </div>
+        <div class="controls">
+            <button id="startBtn">
+                <i class="fas fa-play"></i>
+                Başlat
+            </button>
+            <button id="stopBtn">
+                <i class="fas fa-stop"></i>
+                Durdur
+            </button>
         </div>
     
-        <!-- Konuşma Süresi Tablosu -->
-        <h2>Konuşma Süreleri</h2>
-        <table border="1" id="speechTable">
+        <h2><i class="fas fa-chart-bar"></i> Konuşma Süreleri</h2>
+        <table id="speechTable">
             <thead>
                 <tr>
-                    <th>Kişi</th>
-                    <th>Konuşma Süresi (saniye)</th>
+                    <th><i class="fas fa-user"></i> Kişi</th>
+                    <th><i class="fas fa-clock"></i> Konuşma Süresi (saniye)</th>
                 </tr>
             </thead>
             <tbody>
                 <!-- Dinamik olarak eklenecek -->
             </tbody>
         </table>
-    </div>
-    
     </div>
 
     <script>
@@ -109,31 +236,27 @@
         startBtn.addEventListener('click', () => {
             cameraFeed.src = '/camera_stream?' + new Date().getTime();
             cameraFeed.style.display = 'block';
-    
-            // Konuşma verilerini her 2 saniyede bir al
             speechInterval = setInterval(fetchSpeechData, 2000);
         });
     
         stopBtn.addEventListener('click', () => {
             cameraFeed.src = '';
             cameraFeed.style.display = 'none';
-    
             clearInterval(speechInterval);
         });
     
         function fetchSpeechData() {
-            fetch('/speech_data')  // Sunucu bu endpoint'i sağlamalı
+            fetch('/speech_data')
                 .then(response => response.json())
                 .then(data => {
-                    speechTableBody.innerHTML = ''; // Eski satırları temizle
-    
+                    speechTableBody.innerHTML = '';
                     data.forEach(item => {
                         const row = document.createElement('tr');
                         const nameCell = document.createElement('td');
                         const timeCell = document.createElement('td');
     
-                        nameCell.textContent = item.kisi;
-                        timeCell.textContent = item.sure;
+                        nameCell.innerHTML = `<i class="fas fa-user"></i> ${item.kisi}`;
+                        timeCell.innerHTML = `<i class="fas fa-clock"></i> ${item.sure}`;
     
                         row.appendChild(nameCell);
                         row.appendChild(timeCell);
@@ -145,6 +268,5 @@
                 });
         }
     </script>
-    
 </body>
 </html>
