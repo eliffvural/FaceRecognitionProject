@@ -177,6 +177,8 @@ def generate_frames():
 
     talking_durations = defaultdict(float)     # Toplam konuşma süresi
     talking_start_times = {}                   # Aktif konuşma başlangıçları
+    face_appearance_times = {}  # face_id -> first_seen_time
+
     currently_talking = set() 
 
     unknown_faces = {}
@@ -199,10 +201,18 @@ def generate_frames():
 
             if name is None:
                 face_id = hash(face.tobytes())
-                if face_id not in unknown_faces:
+
+                if face_id not in face_appearance_times:
+                    face_appearance_times[face_id] = time.time()
+
+                elapsed = time.time() - face_appearance_times[face_id]
+                if elapsed >= 2.0 and face_id not in unknown_faces:
                     unknown_counter += 1
-                    unknown_faces[face_id] = f"Person{chr(64 + unknown_counter)}"  # A, B, C...
-                name = unknown_faces[face_id]
+                    unknown_faces[face_id] = f"Person{chr(64 + unknown_counter)}"
+
+                name = unknown_faces.get(face_id, None)
+                if name is None:
+                    continue  # Hala 2 saniye dolmadıysa işlemi atla
 
 
             cv2.rectangle(frame, (x, y), (x2, y2), (0, 255, 0), 2)
